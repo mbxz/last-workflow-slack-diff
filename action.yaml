@@ -1,6 +1,9 @@
 name: 'Last successful sha'
 description: 'Get sha of last successful workflow run on current branch.'
 inputs:
+  slack_channel:
+    description: Slack channel to report result to
+    required: true
   github_token:
     description: Secret GitHub API token to use for making API requests.
     default: ${{ github.token }}
@@ -33,11 +36,30 @@ runs:
         echo "Workflow id: ${WORKFLOW_ID}"
     - name: Get previous build status
       shell: bash
-      id: last_sha
       run: |
-        last_sha=$(curl --silent --header 'authorization: Bearer ${{ inputs.github_token }}' \
+        LAST_SHA=$(curl --silent --header 'authorization: Bearer ${{ inputs.github_token }}' \
                                     --header 'content-type: application/json' \
         "${{ github.api_url }}/repos/${{ github.repository }}/actions/workflows/${{ env.WORKFLOW_ID }}/runs?per_page=1&status=completed&branch=${{ env.BRANCH_NAME }}" \
         | jq -r .workflow_runs[0].head_sha)
-        echo "::set-output name=last_sha::$last_sha"
-        echo "Sha of previous successful workflow: $last_sha"
+        echo "LAST_SHA=$LAST_SHA" >> $GITHUB_ENV
+        echo "Sha of previous successful workflow: $LAST_SHA"
+    - name: Report Deployment Status
+      uses: slackapi/slack-github-action@v1.23.0
+      with:
+        channel-id: ${{ inputs.slack_channel }} 
+        payload: |
+          {
+            "text": "${{ fromJSON('["Deployment Failed", "Deployment Successful"]')[job.status == 'success'] }}",
+            "attachments": [
+              {
+                "color": "${{ fromJSON('["danger", "good"]')[job.status == 'success'] }}",
+                "fields": [{
+                  "title": "${{ github.repository }} - Version ${{ github.run_number }}",
+                  "value": "<https://github.com/${{ github.repository }}/compare/${{ env.LAST_SHA }}...${{ github.sha }}|Released Diff>",
+                  "short": false
+                }]
+              }
+            ]
+          }
+      env:
+        SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
