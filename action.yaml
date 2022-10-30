@@ -49,7 +49,7 @@ runs:
         channel-id: ${{ inputs.slack_channel }} 
         payload: |
           {
-            "text": "${{ fromJSON('["Deployment Failed", "Deployment Successful"]')[job.status == 'success'] }}",
+            "text": "${{ fromJSON('["Deployment Failed :meow_knit:", "Deployment Successful :meow_mage:"]')[job.status == 'success'] }}",
             "attachments": [
               {
                 "color": "${{ fromJSON('["danger", "good"]')[job.status == 'success'] }}",
